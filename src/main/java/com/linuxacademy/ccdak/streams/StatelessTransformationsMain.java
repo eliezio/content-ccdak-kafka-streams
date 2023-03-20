@@ -2,6 +2,7 @@ package com.linuxacademy.ccdak.streams;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import org.apache.kafka.common.serialization.Serdes;
@@ -10,7 +11,9 @@ import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.kstream.Branched;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.Named;
 
 public class StatelessTransformationsMain {
 
@@ -29,10 +32,11 @@ public class StatelessTransformationsMain {
         final KStream<String, String> source = builder.stream("stateless-transformations-input-topic");
         
         // Split the stream into two streams, one containing all records where the key begins with "a", and the other containing all other records.
-        KStream<String, String>[] branches = source
-            .branch((key, value) -> key.startsWith("a"), (key, value) -> true);
-        KStream<String, String> aKeysStream = branches[0];
-        KStream<String, String> othersStream = branches[1];
+        Map<String, KStream<String, String>> branches = source.split(Named.as("split-"))
+                .branch((key, value) -> key.startsWith("a"), Branched.as("aKeysStream"))
+                .defaultBranch(Branched.as("othersStream"));
+        KStream<String, String> aKeysStream = branches.get("split-aKeysStream");
+        KStream<String, String> othersStream = branches.get("split-othersStream");
         
         // Remove any records from the "a" stream where the value does not also start with "a".
         aKeysStream = aKeysStream.filter((key, value) -> value.startsWith("a"));
